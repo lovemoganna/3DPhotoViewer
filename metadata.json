@@ -1,0 +1,5 @@
+{
+  "name": "Universal 3D Image Viewer",
+  "description": "A versatile React application leveraging Three.js to view uploaded images (JPG, PNG) as textures and SVG files as extruded 3D geometry with customizable rendering settings.",
+  "requestFramePermissions": []
+}
