@@ -47,8 +47,8 @@ const LoadingOverlay = () => {
   const { active, progress } = useProgress();
   if (!active) return null;
   return (
-    <div className="absolute inset-0 flex items-center justify-center z-50 bg-white/60 backdrop-blur-sm transition-all duration-300">
-      <div className="flex flex-col items-center gap-3">
+    <div className="absolute inset-0 flex items-center justify-center z-50 bg-white/60 backdrop-blur-md transition-all duration-500">
+      <div className="flex flex-col items-center gap-4 bg-white/80 p-8 rounded-2xl shadow-xl border border-white/50">
         <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
         <div className="text-gray-600 font-medium text-sm tracking-wide">Loading Asset {Math.round(progress)}%</div>
       </div>
@@ -59,12 +59,12 @@ const LoadingOverlay = () => {
 const DropOverlay = ({ isDragging }: { isDragging: boolean }) => {
     if (!isDragging) return null;
     return (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-50/90 backdrop-blur-sm border-8 border-blue-400 border-dashed m-4 rounded-3xl pointer-events-none animate-pulse">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-50/90 backdrop-blur-md border-8 border-blue-400 border-dashed m-6 rounded-[2rem] pointer-events-none animate-in fade-in zoom-in duration-200">
             <div className="text-center">
-                <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-24 h-24 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-200">
                     <UploadIcon />
                 </div>
-                <h2 className="text-3xl font-bold text-blue-800">Drop to Upload</h2>
+                <h2 className="text-4xl font-bold text-blue-800 tracking-tight">Drop to Upload</h2>
             </div>
         </div>
     );
@@ -189,7 +189,7 @@ export default function App() {
 
   return (
     <div 
-        className="w-full h-full relative overflow-hidden select-none"
+        className="w-full h-full relative overflow-hidden select-none bg-gradient-to-br from-gray-50 to-gray-200"
         onDragEnter={handleDragEnter}
         onDragOver={(e) => e.preventDefault()}
         onDragLeave={handleDragLeave}
@@ -198,21 +198,28 @@ export default function App() {
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept={Object.keys(ACCEPTED_IMAGE_TYPES).join(',')} className="hidden" />
 
       {/* --- Top Navigation Bar --- */}
-      <div className="absolute top-0 left-0 w-full p-4 z-10 flex justify-between items-center pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-3">
-             <div className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-2xl shadow-sm border border-white/60 flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse"></div>
-                <h1 className="text-lg font-bold text-gray-800 tracking-tight">
-                    View<span className="text-blue-600">3D</span>
-                </h1>
+      <div className="absolute top-0 left-0 w-full p-6 z-10 flex justify-between items-start pointer-events-none">
+        <div className="pointer-events-auto flex flex-col gap-3">
+             <div className="bg-white/90 backdrop-blur-xl px-5 py-3 rounded-2xl shadow-lg border border-white/50 flex items-center gap-3 transition-transform hover:scale-[1.02]">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-blue-200 shadow-md">
+                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 className="text-lg font-bold text-gray-900 tracking-tight leading-none">
+                        Universal<span className="text-blue-600">Viewer</span>
+                    </h1>
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">3D Asset Preview</span>
+                </div>
             </div>
 
             {file && !annotationImage && (
-                 <div className="bg-white/80 backdrop-blur-md px-1 py-1 rounded-2xl shadow-sm border border-white/60 flex gap-1">
-                    <Button variant="secondary" className="!py-1.5 !px-3 !text-xs !rounded-xl" onClick={() => fileInputRef.current?.click()}>
+                 <div className="bg-white/90 backdrop-blur-xl px-2 py-2 rounded-2xl shadow-lg border border-white/50 flex gap-2 w-fit animate-in slide-in-from-left-4 fade-in duration-300">
+                    <Button variant="secondary" className="!py-1.5 !px-3 !text-xs !rounded-xl active:scale-95" onClick={() => fileInputRef.current?.click()}>
                         Replace
                     </Button>
-                    <Button variant="danger" className="!py-1.5 !px-3 !text-xs !rounded-xl" onClick={handleClear}>
+                    <Button variant="danger" className="!py-1.5 !px-3 !text-xs !rounded-xl active:scale-95" onClick={handleClear}>
                         Clear
                     </Button>
                  </div>
@@ -220,10 +227,10 @@ export default function App() {
         </div>
 
         {file && !annotationImage && (
-             <div className="pointer-events-auto">
+             <div className="pointer-events-auto animate-in slide-in-from-right-4 fade-in duration-300">
                 <button 
                     onClick={() => setIsPanelOpen(!isPanelOpen)}
-                    className="bg-white hover:bg-gray-50 text-gray-700 p-3 rounded-full shadow-lg border border-gray-100 transition-transform active:scale-95 group"
+                    className="bg-white hover:bg-gray-50 text-gray-700 p-3.5 rounded-2xl shadow-xl border border-white/50 transition-all hover:scale-105 active:scale-95 group"
                 >
                     <SettingsIcon />
                 </button>
@@ -290,10 +297,11 @@ export default function App() {
 
                     <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
                         <GizmoViewcube 
-                            color="gray"
-                            strokeColor="white"
-                            textColor="black"
+                            color="#f3f4f6"
+                            strokeColor="#d1d5db"
+                            textColor="#374151"
                             hoverColor="#3b82f6"
+                            opacity={0.9}
                         />
                     </GizmoHelper>
 
@@ -301,18 +309,18 @@ export default function App() {
                 </Canvas>
             </div>
 
-            {/* --- Bottom Controls --- */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-3 w-full px-4 pointer-events-none">
+            {/* --- Bottom Controls (Floating Island) --- */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-3 w-full px-4 pointer-events-none">
                 
                 {/* Mode Switcher */}
-                <div className="pointer-events-auto flex items-center bg-white/80 backdrop-blur-xl rounded-full shadow-xl border border-white/50 p-1.5 gap-1">
+                <div className="pointer-events-auto flex items-center bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 p-1.5 gap-1 animate-in slide-in-from-bottom-8 fade-in duration-500">
                     <button
                         onClick={() => setControlMode('pan')}
                         title="Pan Tool (Space)"
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 active:scale-95 ${
                             controlMode === 'pan' 
-                            ? 'bg-blue-600 text-white shadow-md' 
-                            : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' 
+                            : 'text-gray-500 hover:bg-white hover:text-gray-800'
                         }`}
                     >
                         <PanIcon /> <span>Pan</span>
@@ -320,51 +328,53 @@ export default function App() {
                     <button
                         onClick={() => setControlMode('rotate')}
                         title="Rotate Tool (Space)"
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 active:scale-95 ${
                             controlMode === 'rotate' 
-                            ? 'bg-blue-600 text-white shadow-md' 
-                            : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' 
+                            : 'text-gray-500 hover:bg-white hover:text-gray-800'
                         }`}
                     >
                         <RotateIcon /> <span>Rotate</span>
                     </button>
                     
-                    <div className="w-px h-6 bg-gray-300 mx-1"></div>
+                    <div className="w-px h-8 bg-gray-300 mx-2 opacity-50"></div>
                     
-                    <button 
-                        onClick={handleZoomIn}
-                        className="p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 rounded-full transition-colors"
-                        title="Zoom In (+)"
-                    >
-                        <ZoomInIcon />
-                    </button>
-                    <button 
-                        onClick={handleZoomOut}
-                        className="p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 rounded-full transition-colors"
-                        title="Zoom Out (-)"
-                    >
-                        <ZoomOutIcon />
-                    </button>
-                    <button 
-                        onClick={handleResetCamera}
-                        className="p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 rounded-full transition-colors"
-                        title="Reset View (R)"
-                    >
-                        <HomeIcon />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button 
+                            onClick={handleZoomIn}
+                            className="p-2.5 text-gray-500 hover:bg-white hover:text-blue-600 rounded-xl transition-all active:scale-95"
+                            title="Zoom In (+)"
+                        >
+                            <ZoomInIcon />
+                        </button>
+                        <button 
+                            onClick={handleZoomOut}
+                            className="p-2.5 text-gray-500 hover:bg-white hover:text-blue-600 rounded-xl transition-all active:scale-95"
+                            title="Zoom Out (-)"
+                        >
+                            <ZoomOutIcon />
+                        </button>
+                        <button 
+                            onClick={handleResetCamera}
+                            className="p-2.5 text-gray-500 hover:bg-white hover:text-blue-600 rounded-xl transition-all active:scale-95"
+                            title="Reset View (R)"
+                        >
+                            <HomeIcon />
+                        </button>
+                    </div>
 
-                    <div className="w-px h-6 bg-gray-300 mx-1"></div>
+                    <div className="w-px h-8 bg-gray-300 mx-2 opacity-50"></div>
 
                     <button 
                         onClick={handleSnapshot}
-                        className="flex items-center gap-2 px-3 py-2 text-purple-600 bg-purple-50 hover:bg-purple-100 hover:text-purple-700 rounded-full transition-colors font-bold text-sm"
+                        className="flex items-center gap-2 px-4 py-2.5 text-purple-700 bg-purple-50 hover:bg-purple-100 hover:text-purple-800 rounded-xl transition-all active:scale-95 font-bold text-sm border border-purple-100"
                         title="Snapshot & Annotate"
                     >
                         <CameraIcon /> Annotate
                     </button>
                 </div>
                 
-                <p className="text-[10px] text-gray-400 font-medium bg-white/50 backdrop-blur px-3 py-1 rounded-full shadow-sm">
+                <p className="text-[10px] text-gray-400 font-bold bg-white/40 backdrop-blur-md px-3 py-1 rounded-full shadow-sm border border-white/20 uppercase tracking-widest opacity-0 hover:opacity-100 transition-opacity duration-300 cursor-help">
                     Left Click: {controlMode === 'rotate' ? 'Rotate' : 'Pan'} • Space: Switch Mode • R: Reset
                 </p>
             </div>
@@ -394,18 +404,20 @@ const EmptyState: React.FC<{ onUpload: () => void }> = ({ onUpload }) => {
         <div className="flex flex-col items-center justify-center h-full w-full">
             <div 
                 onClick={onUpload}
-                className="group relative flex flex-col items-center p-12 bg-white/40 backdrop-blur-md rounded-3xl border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-white/60 transition-all cursor-pointer shadow-xl max-w-lg w-full mx-6"
+                className="group relative flex flex-col items-center p-16 bg-white/60 backdrop-blur-xl rounded-[2.5rem] border border-white shadow-2xl hover:shadow-blue-500/10 transition-all duration-500 cursor-pointer max-w-lg w-full mx-6 active:scale-[0.98]"
             >
-                <div className="w-24 h-24 bg-white rounded-full shadow-lg flex items-center justify-center mb-6 group-hover:scale-110 group-hover:text-blue-600 text-gray-400 transition-all duration-300">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-purple-50/50 rounded-[2.5rem] -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                
+                <div className="w-28 h-28 bg-white rounded-3xl shadow-xl flex items-center justify-center mb-8 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 ease-out border border-gray-50">
+                    <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
                 </div>
-                <h2 className="text-2xl font-black text-gray-700 mb-2 group-hover:text-blue-700 transition-colors">Upload 2D Asset</h2>
-                <p className="text-gray-500 text-center mb-6 max-w-xs">
-                    Support for <span className="font-mono text-gray-700 bg-gray-100 px-1 rounded">.SVG</span> extrusion and <span className="font-mono text-gray-700 bg-gray-100 px-1 rounded">.PNG/.JPG</span> projection.
+                <h2 className="text-3xl font-black text-gray-800 mb-3 tracking-tight group-hover:text-blue-700 transition-colors">Upload 2D Asset</h2>
+                <p className="text-gray-500 text-center mb-8 max-w-xs leading-relaxed font-medium">
+                    Support for <span className="font-bold text-gray-700 font-mono">.SVG</span> extrusion and <span className="font-bold text-gray-700 font-mono">.PNG/.JPG</span> projection.
                 </p>
-                <Button variant="primary" className="!rounded-full !px-8 shadow-blue-200">
+                <Button variant="primary" className="!rounded-full !px-10 !py-3 !text-lg shadow-xl shadow-blue-500/20 group-hover:shadow-blue-500/40">
                     Select File
                 </Button>
             </div>

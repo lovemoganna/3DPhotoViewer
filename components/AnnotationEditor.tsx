@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 
 interface AnnotationEditorProps {
@@ -33,15 +34,18 @@ const UndoIcon = () => <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" 
 const DownloadIcon = () => <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>;
 const CopyIcon = () => <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>;
 const CloseIcon = () => <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12" /></svg>;
+const ZoomInIcon = () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 4v16m8-8H4"/></svg>;
+const ZoomOutIcon = () => <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M20 12H4"/></svg>;
+
 
 // Feishu-like Colors
 const PALETTE = [
+  '#000000', // Black (Default)
   '#F54A45', // Red
   '#FDCB00', // Yellow
   '#22C55E', // Green
   '#3370FF', // Blue
   '#FFFFFF', // White
-  '#1F2329', // Black
 ];
 
 // --- Shared Rendering Logic ---
@@ -114,8 +118,7 @@ const renderScene = (
            ctx.fill();
        } else if (action.type === 'text' && action.text) {
            const fontSize = action.text.fontSize;
-           // STRICT SYNC: Must match CSS exactly
-           ctx.font = `bold ${fontSize}px sans-serif`;
+           ctx.font = `bold ${fontSize}px "Noto Sans SC", sans-serif`;
            ctx.textBaseline = 'top'; 
            
            const lines = action.text.content.split('\n');
@@ -123,8 +126,10 @@ const renderScene = (
            
            lines.forEach((line, index) => {
                const y = action.text!.y + (index * lineHeight);
-               // Outline - Reduced thickness for better readability
-               ctx.lineWidth = Math.max(2, fontSize / 8);
+               // Outline - Optimized to be thinner relative to font size
+               // Use 1/12th of fontSize, clamped between 2px (visible) and 5px (not too thick)
+               const strokeWidth = Math.max(2, fontSize / 12);
+               ctx.lineWidth = strokeWidth;
                ctx.strokeStyle = 'white';
                ctx.lineJoin = 'round';
                ctx.miterLimit = 2;
@@ -156,20 +161,23 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
   
-  // Font Size State
-  const [baseFontSize, setBaseFontSize] = useState(32);
+  const [baseFontSize, setBaseFontSize] = useState(16); // Default reduced to 16px
   
   const [currentTool, setCurrentTool] = useState<ToolType>('rect');
-  const [currentColor, setCurrentColor] = useState<string>('#F54A45');
+  const [currentColor, setCurrentColor] = useState<string>('#000000'); 
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [interactionStart, setInteractionStart] = useState<Point | null>(null);
+  const [hoverCursor, setHoverCursor] = useState<'default' | 'move' | 'text' | 'crosshair' | 'grab'>('default');
   
   // Text State
   const [textInput, setTextInput] = useState<{ 
       x: number; y: number; worldX: number; worldY: number; visible: boolean;
   }>({ x: 0, y: 0, worldX: 0, worldY: 0, visible: false });
   const textValueRef = useRef(''); 
+
+  const [draggingTextIndex, setDraggingTextIndex] = useState<number | null>(null);
+  const [dragOriginalPos, setDragOriginalPos] = useState<Point | null>(null);
 
   const [toast, setToast] = useState<string | null>(null);
 
@@ -179,10 +187,10 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
     img.src = imageSrc;
     img.onload = () => {
       setImageObj(img);
-      const fs = Math.max(16, Math.min(Math.max(img.width, img.height) * 0.03, 80));
-      setBaseFontSize(fs);
+      // Calc reasonable font size but prefer 16px as base
+      const fs = Math.max(14, Math.min(Math.max(img.width, img.height) * 0.02, 60));
+      setBaseFontSize(16); // Strict default
 
-      // Generate Pixelated Buffer
       const pCanvas = document.createElement('canvas');
       const pCtx = pCanvas.getContext('2d');
       if (pCtx) {
@@ -197,7 +205,6 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
           setPixelatedImage(pCanvas);
       }
 
-      // Initial Fit
       if (containerRef.current) {
          const { clientWidth, clientHeight } = containerRef.current;
          const scaleX = (clientWidth * 0.9) / img.width;
@@ -212,7 +219,7 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
     };
   }, [imageSrc]);
 
-  // --- 2. Reactive Render Logic (No Loop) ---
+  // --- 2. Reactive Render Logic ---
   const renderCanvas = useCallback(() => {
      const canvas = canvasRef.current;
      const ctx = canvas?.getContext('2d');
@@ -221,7 +228,6 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
      const { clientWidth, clientHeight } = containerRef.current;
      const dpr = window.devicePixelRatio || 1;
      
-     // Resize if needed
      if (canvas.width !== clientWidth * dpr || canvas.height !== clientHeight * dpr) {
          canvas.width = clientWidth * dpr;
          canvas.height = clientHeight * dpr;
@@ -241,13 +247,69 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
      ctx.restore();
   }, [imageObj, pixelatedImage, scale, offset, history, tempAction]);
 
-  // Trigger render on state change
   useEffect(() => {
       renderCanvas();
   }, [renderCanvas]);
 
+  // --- 3. Zoom Logic (Native Listener) ---
+  useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
 
-  // --- 3. Text Logic ---
+      const handleWheel = (e: WheelEvent) => {
+          if (textInput.visible) return; 
+          e.preventDefault();
+
+          const delta = -e.deltaY * 0.001;
+          const factor = 1 + delta;
+          
+          const rect = container.getBoundingClientRect();
+          const mx = e.clientX - rect.left; 
+          const my = e.clientY - rect.top;
+          
+          const wx = (mx - offset.x) / scale; 
+          const wy = (my - offset.y) / scale;
+          
+          const newScale = Math.min(Math.max(0.05, scale * factor), 10);
+          const newOffset = { 
+              x: mx - wx * newScale, 
+              y: my - wy * newScale 
+          };
+
+          setScale(newScale);
+          setOffset(newOffset);
+      };
+
+      container.addEventListener('wheel', handleWheel, { passive: false });
+      return () => container.removeEventListener('wheel', handleWheel);
+  }, [scale, offset, textInput.visible]); 
+
+  const zoomIn = () => {
+      if(!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const mx = rect.width / 2;
+      const my = rect.height / 2;
+      const wx = (mx - offset.x) / scale; 
+      const wy = (my - offset.y) / scale;
+      const newScale = Math.min(10, scale * 1.2);
+      setOffset({ x: mx - wx * newScale, y: my - wy * newScale });
+      setScale(newScale);
+  };
+
+  const zoomOut = () => {
+      if(!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const mx = rect.width / 2;
+      const my = rect.height / 2;
+      const wx = (mx - offset.x) / scale; 
+      const wy = (my - offset.y) / scale;
+      const newScale = Math.max(0.05, scale / 1.2);
+      setOffset({ x: mx - wx * newScale, y: my - wy * newScale });
+      setScale(newScale);
+  };
+
+
+  // --- 4. Text & Input Logic ---
   const resizeTextarea = () => {
       const el = textInputRef.current;
       if (!el) return;
@@ -258,7 +320,6 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
 
   const commitText = useCallback(() => {
       if (!textInput.visible) return;
-      
       const content = textValueRef.current;
       if (content && content.trim()) {
           setHistory(prev => [...prev, {
@@ -268,12 +329,10 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
               lineWidth: 1
           }]);
       }
-      
       textValueRef.current = '';
       setTextInput(p => ({ ...p, visible: false }));
   }, [textInput.visible, textInput.worldX, textInput.worldY, baseFontSize, currentColor]);
 
-  // Auto-focus logic
   useEffect(() => {
     if (textInput.visible && textInputRef.current) {
         textInputRef.current.focus();
@@ -281,7 +340,7 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
     }
   }, [textInput.visible]);
 
-  // --- 4. Event Handlers ---
+  // --- 5. Event Handlers ---
 
   const screenToWorld = useCallback((screenX: number, screenY: number): Point => {
       if (!containerRef.current) return { x: 0, y: 0 };
@@ -292,28 +351,69 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
       };
   }, [offset, scale]);
 
+  // Helper to check if mouse is over a text element
+  const hitTestText = (worldPos: Point, ctx: CanvasRenderingContext2D): number => {
+      // Must set baseline to 'top' to match renderScene, otherwise hit box is offset
+      ctx.textBaseline = 'top'; 
+      
+      // Loop backwards to find top-most
+      for (let i = history.length - 1; i >= 0; i--) {
+          const action = history[i];
+          if (action.type === 'text' && action.text) {
+              ctx.font = `bold ${action.text.fontSize}px "Noto Sans SC", sans-serif`;
+              const lines = action.text.content.split('\n');
+              let maxWidth = 0;
+              lines.forEach(l => maxWidth = Math.max(maxWidth, ctx.measureText(l).width));
+              const totalHeight = lines.length * action.text.fontSize * 1.2;
+              
+              // Add some padding for easier grabbing
+              const padding = 10 / scale; 
+              
+              if (
+                  worldPos.x >= action.text.x - padding && 
+                  worldPos.x <= action.text.x + maxWidth + padding &&
+                  worldPos.y >= action.text.y - padding && 
+                  worldPos.y <= action.text.y + totalHeight + padding
+              ) {
+                  return i;
+              }
+          }
+      }
+      return -1;
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
       if (!imageObj) return;
 
-      // 1. If text input is open
       if (textInput.visible) {
-          // If clicked inside the box, do nothing
           if (e.target === textInputRef.current) return;
-          // If clicked outside, commit
           commitText();
           return;
       }
 
       const worldPos = screenToWorld(e.clientX, e.clientY);
 
-      // 2. Pan
+      // Pan
       if (e.button === 1 || isPanning || e.buttons === 4) {
           setInteractionStart({ x: e.clientX, y: e.clientY });
           return;
       }
 
-      // 3. Start Text Tool
+      // Start Text Tool OR Drag existing Text
       if (currentTool === 'text') {
+          const ctx = canvasRef.current?.getContext('2d');
+          if (ctx) {
+             const hitIndex = hitTestText(worldPos, ctx);
+             if (hitIndex !== -1) {
+                  // HIT: Start dragging
+                  setDraggingTextIndex(hitIndex);
+                  setInteractionStart(worldPos);
+                  setDragOriginalPos({ x: history[hitIndex].text!.x, y: history[hitIndex].text!.y });
+                  return;
+             }
+          }
+
+          // NO HIT: Create New Text
           const rect = containerRef.current!.getBoundingClientRect();
           textValueRef.current = ''; 
           setTextInput({ 
@@ -321,11 +421,10 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
               y: e.clientY - rect.top, 
               worldX: worldPos.x, worldY: worldPos.y, visible: true
           });
-          // Focus is handled by useEffect
           return;
       }
       
-      // 4. Start Drawing
+      // Start Drawing
       setInteractionStart(worldPos);
       setIsDrawing(true);
       if (currentTool === 'pen') {
@@ -335,6 +434,46 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
 
   const handleMouseMove = (e: React.MouseEvent) => {
       if (textInput.visible) return;
+      
+      const worldPos = screenToWorld(e.clientX, e.clientY);
+
+      // 1. Text Dragging Logic
+      if (draggingTextIndex !== null && interactionStart && dragOriginalPos) {
+           const dx = worldPos.x - interactionStart.x;
+           const dy = worldPos.y - interactionStart.y;
+           
+           setHistory(prev => {
+               const next = [...prev];
+               const item = next[draggingTextIndex];
+               if (item && item.text) {
+                    next[draggingTextIndex] = {
+                        ...item,
+                        text: {
+                            ...item.text,
+                            x: dragOriginalPos.x + dx,
+                            y: dragOriginalPos.y + dy
+                        }
+                    };
+               }
+               return next;
+           });
+           setHoverCursor('move');
+           return;
+      }
+
+      // 2. Cursor Update (Hover detection)
+      if (!interactionStart && currentTool === 'text') {
+          const ctx = canvasRef.current?.getContext('2d');
+          if (ctx && hitTestText(worldPos, ctx) !== -1) {
+              setHoverCursor('move');
+          } else {
+              setHoverCursor('text');
+          }
+      } else if (!interactionStart) {
+          setHoverCursor(isPanning ? 'grab' : 'crosshair');
+      }
+
+      // 3. Panning / Drawing
       if (!interactionStart) return;
 
       if (e.buttons === 4 || (e.buttons === 1 && isPanning)) {
@@ -342,14 +481,12 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
         const dy = e.clientY - (interactionStart as any).y;
         setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
         setInteractionStart({ x: e.clientX, y: e.clientY } as any);
-        renderCanvas(); // Force render during interaction
+        renderCanvas();
         return;
       }
       
-      const worldPos = screenToWorld(e.clientX, e.clientY);
       if (isDrawing) {
         if (currentTool === 'pen') {
-            // Update history directly for pen to be responsive
              setHistory(prev => {
                 const copy = [...prev];
                 const last = copy[copy.length - 1];
@@ -368,7 +505,41 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
       }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent) => {
+      // Finish Text Dragging
+      if (draggingTextIndex !== null && interactionStart && dragOriginalPos) {
+          const worldPos = screenToWorld(e.clientX, e.clientY);
+          const dx = worldPos.x - interactionStart.x;
+          const dy = worldPos.y - interactionStart.y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+
+          // If moved < 5px, consider it a Click -> Edit Mode
+          if (dist < 5) {
+               const item = history[draggingTextIndex];
+               setHistory(prev => prev.filter((_, i) => i !== draggingTextIndex));
+               
+               textValueRef.current = item.text!.content;
+               setCurrentColor(item.color);
+               setBaseFontSize(item.text!.fontSize);
+               
+               const screenX = item.text!.x * scale + offset.x;
+               const screenY = item.text!.y * scale + offset.y;
+
+               setTextInput({
+                   x: screenX, 
+                   y: screenY,
+                   worldX: item.text!.x,
+                   worldY: item.text!.y,
+                   visible: true
+               });
+          }
+          
+          setDraggingTextIndex(null);
+          setInteractionStart(null);
+          setDragOriginalPos(null);
+          return;
+      }
+
       if (isDrawing) {
           setIsDrawing(false);
           setInteractionStart(null);
@@ -380,7 +551,7 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
       if (interactionStart && !isDrawing) setInteractionStart(null); 
   };
 
-  // --- 5. Export Logic ---
+  // --- 6. Export / Copy ---
   const generateHighResBlob = async (): Promise<Blob | null> => {
       if (!imageObj) return null;
       const temp = document.createElement('canvas');
@@ -446,6 +617,17 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
       return () => { window.removeEventListener('keydown', handler); window.removeEventListener('keyup', upHandler); };
   }, [textInput.visible, commitText, onClose]);
 
+  const strokeWidth = Math.max(0.5, (baseFontSize / 12) * scale);
+  const textShadowCSS = `
+    -${strokeWidth}px -${strokeWidth}px 0 #fff,
+    ${strokeWidth}px -${strokeWidth}px 0 #fff,
+    -${strokeWidth}px ${strokeWidth}px 0 #fff,
+    ${strokeWidth}px ${strokeWidth}px 0 #fff,
+    0px -${strokeWidth}px 0 #fff,
+    -${strokeWidth}px 0px 0 #fff,
+    0px ${strokeWidth}px 0 #fff,
+    ${strokeWidth}px 0px 0 #fff
+  `;
 
   return (
     <div className="absolute inset-0 z-50 bg-[#1F2329] flex flex-col overflow-hidden animate-in fade-in duration-200">
@@ -461,21 +643,10 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
       <div 
         ref={containerRef} 
         className="flex-1 relative overflow-hidden"
-        onWheel={(e) => {
-            if (textInput.visible) return;
-            const delta = -e.deltaY * 0.001;
-            const factor = 1 + delta;
-            const rect = containerRef.current!.getBoundingClientRect();
-            const mx = e.clientX - rect.left; const my = e.clientY - rect.top;
-            const wx = (mx - offset.x) / scale; const wy = (my - offset.y) / scale;
-            const newScale = Math.min(Math.max(0.05, scale * factor), 10);
-            setScale(newScale);
-            setOffset({ x: mx - wx * newScale, y: my - wy * newScale });
-        }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        style={{ cursor: isPanning ? 'grab' : (currentTool === 'text' ? 'text' : 'crosshair') }}
+        style={{ cursor: hoverCursor }}
       >
         <canvas ref={canvasRef} className="block pointer-events-none" />
 
@@ -501,15 +672,15 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
                     fontSize: `${baseFontSize * scale}px`, 
                     lineHeight: '1.2', 
                     fontWeight: 'bold', 
-                    fontFamily: 'sans-serif',
+                    fontFamily: '"Noto Sans SC", sans-serif',
                     padding: '2px', 
                     margin: 0, 
-                    border: '1px solid ' + currentColor,
-                    background: 'rgba(255,255,255,0.1)',
+                    border: '1px dashed #3b82f6', 
+                    background: 'rgba(255,255,255,0.2)', 
                     transformOrigin: '0 0', 
                     minWidth: '2em', 
                     minHeight: '1.5em',
-                    WebkitTextStroke: `${Math.max(2, (baseFontSize / 8) * scale)}px white`, // Thinner stroke logic
+                    textShadow: textShadowCSS, 
                 }}
                 placeholder="Type..."
             />
@@ -517,8 +688,8 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
       </div>
 
       {/* Toolbar */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white rounded-full shadow-2xl px-4 py-2 flex items-center gap-4 z-20 border border-gray-100">
-         <div className="flex gap-2 border-r border-gray-200 pr-4">
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white rounded-full shadow-2xl px-6 py-3 flex items-center gap-6 z-20 border border-gray-200">
+         <div className="flex gap-3 border-r border-gray-200 pr-6">
              {[
                  { id: 'rect', icon: <RectIcon /> },
                  { id: 'circle', icon: <CircleIcon /> },
@@ -531,17 +702,17 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
                     key={tool.id}
                     // @ts-ignore
                     onClick={() => setCurrentTool(tool.id)}
-                    className={`p-2 rounded-lg transition-all ${currentTool === tool.id ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-200' : 'text-gray-500 hover:bg-gray-100'}`}
+                    className={`p-2.5 rounded-xl transition-all duration-200 active:scale-95 ${currentTool === tool.id ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
                  >
                      {tool.icon}
                  </button>
              ))}
          </div>
 
-         {/* Font Size Control - Visible only when Text tool is active */}
+         {/* Font Size Control */}
          {currentTool === 'text' && (
-            <div className="flex items-center gap-2 border-r border-gray-200 pr-4 pl-2">
-                <span className="text-xs text-gray-400 font-bold uppercase">Size</span>
+            <div className="flex items-center gap-3 border-r border-gray-200 pr-6 pl-2 animate-in fade-in slide-in-from-left-2 duration-200">
+                <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Size</span>
                 <input 
                     type="range" 
                     min="12" 
@@ -549,28 +720,34 @@ export const AnnotationEditor: React.FC<AnnotationEditorProps> = ({ imageSrc, on
                     step="2"
                     value={baseFontSize} 
                     onChange={(e) => setBaseFontSize(Number(e.target.value))}
-                    className="w-20 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    className="w-24 h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-blue-600 hover:accent-blue-500"
                 />
-                <span className="text-xs font-mono text-gray-600 min-w-[24px] text-right">{baseFontSize}</span>
+                <span className="text-xs font-mono text-gray-600 min-w-[24px] text-right font-medium">{baseFontSize}</span>
             </div>
          )}
 
-         <div className="flex gap-2 border-r border-gray-200 pr-4 items-center">
+         <div className="flex gap-3 border-r border-gray-200 pr-6 items-center">
              {PALETTE.map(c => (
                  <button
                     key={c}
                     onClick={() => setCurrentColor(c)}
-                    className={`w-5 h-5 rounded-full border border-gray-200 transition-transform ${currentColor === c ? 'scale-125 ring-2 ring-blue-500 ring-offset-1' : ''}`}
+                    className={`w-6 h-6 rounded-full border border-gray-300 transition-all duration-200 hover:scale-110 active:scale-95 ${currentColor === c ? 'scale-125 ring-2 ring-blue-500 ring-offset-2' : ''}`}
                     style={{ backgroundColor: c }}
                  />
              ))}
          </div>
 
-         <div className="flex gap-2 text-gray-600">
-             <button onClick={() => setHistory(h => h.slice(0, -1))} className="p-2 hover:bg-gray-100 rounded-lg"><UndoIcon /></button>
-             <button onClick={handleCopy} className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg" title="Copy to Clipboard"><CopyIcon /></button>
-             <button onClick={handleSave} className="p-2 hover:bg-green-50 text-green-600 rounded-lg" title="Save File"><DownloadIcon /></button>
-             <button onClick={onClose} className="p-2 hover:bg-red-50 text-red-600 rounded-lg"><CloseIcon /></button>
+         {/* Zoom Controls */}
+         <div className="flex gap-2 border-r border-gray-200 pr-6 text-gray-500">
+             <button onClick={zoomIn} className="p-2.5 hover:bg-gray-100 hover:text-gray-800 rounded-xl transition-all active:scale-95" title="Zoom In"><ZoomInIcon /></button>
+             <button onClick={zoomOut} className="p-2.5 hover:bg-gray-100 hover:text-gray-800 rounded-xl transition-all active:scale-95" title="Zoom Out"><ZoomOutIcon /></button>
+         </div>
+
+         <div className="flex gap-3 text-gray-500">
+             <button onClick={() => setHistory(h => h.slice(0, -1))} className="p-2.5 hover:bg-gray-100 hover:text-gray-800 rounded-xl transition-all active:scale-95" title="Undo"><UndoIcon /></button>
+             <button onClick={handleCopy} className="p-2.5 hover:bg-blue-50 text-blue-600 rounded-xl transition-all active:scale-95" title="Copy to Clipboard"><CopyIcon /></button>
+             <button onClick={handleSave} className="p-2.5 hover:bg-green-50 text-green-600 rounded-xl transition-all active:scale-95" title="Save File"><DownloadIcon /></button>
+             <button onClick={onClose} className="p-2.5 hover:bg-red-50 text-red-600 rounded-xl transition-all active:scale-95" title="Close"><CloseIcon /></button>
          </div>
       </div>
     </div>

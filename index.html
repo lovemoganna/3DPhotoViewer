@@ -4,26 +4,31 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>Universal 3D Image Viewer</title>
+    <!-- Using CDN Tailwind for simplicity in this setup, though postcss is configured in package.json if you want to switch -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
     <style>
       body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: linear-gradient(to bottom right, #f3f4f6, #e5e7eb); }
       #root { height: 100%; width: 100%; }
     </style>
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
     "react/": "https://aistudiocdn.com/react@^19.2.1/",
     "react": "https://aistudiocdn.com/react@^19.2.1",
-    "@react-three/fiber": "https://aistudiocdn.com/@react-three/fiber@^9.4.2",
-    "three/": "https://aistudiocdn.com/three@^0.181.2/",
-    "three": "https://aistudiocdn.com/three@^0.181.2",
+    "vite": "https://aistudiocdn.com/vite@^7.2.7",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.2",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "@react-three/drei": "https://aistudiocdn.com/@react-three/drei@^10.7.7"
+    "@react-three/fiber": "https://aistudiocdn.com/@react-three/fiber@^9.4.2",
+    "@react-three/drei": "https://aistudiocdn.com/@react-three/drei@^10.7.7",
+    "three/": "https://aistudiocdn.com/three@^0.181.2/",
+    "three": "https://aistudiocdn.com/three@^0.181.2"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
